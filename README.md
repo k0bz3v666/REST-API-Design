@@ -1,122 +1,246 @@
-# web-programming-2026-template
+# Ly-Jess — інтернет-зоомагазин
 
-A reusable Django project with no bundled application, SQLite, and Django's
-standard admin, authentication, sessions, messages, and staticfiles support.
+## Про що цей сайт
 
-## Local setup
+Ly-Jess — це простий інтернет-магазин товарів для домашніх тварин: корми, ласощі, іграшки, лежаки, засоби догляду.
 
-Requires the latest patch release of Python 3.12, 3.13, or 3.14. Run these commands from the project directory containing
-`manage.py`.
+Ідея така: людина заходить на сайт, дивиться каталог, шукає товари за назвою, фільтрує за типом тварини, категорією, брендом і ціною, обирає потрібне та оформлює замовлення, вказавши своє ім'я, телефон і адресу.
 
-1. Create and activate a virtual environment:
+## Що є на сайті
 
-   ```bash
-   python -m venv .venv
-   
-   # for linux/macos
-   source .venv/bin/activate
-   # for Windows:
-   .venv\Scripts\activate
-   ```
+- **Категорії.** Корм, ласощі, іграшки, лежаки, догляд тощо.
+- **Бренди.** Виробники товарів. На сторінці бренду видно всі його товари.
+- **Товари.** У кожного є назва, опис, ціна, бренд, категорія, тип тварини (кіт, собака, гризун, птах, рибки), вага чи розмір та кількість на складі.
+- **Замовлення.** Покупець обирає товари й кількість, залишає контакти. Замовлення має статус: нове, відправлене, доставлене або скасоване.
+- **Адміністратор.** Додає, змінює й видаляє товари, бренди та категорії, а також змінює статуси замовлень.
 
-2. Install dependencies:
+> TODO: реєстрація, вхід, профіль з історією замовлень, кошик.
 
-   ```bash
-   python -m pip install -r requirements-dev.txt
-   ```
+> TODO: авторизація і права доступу (поки що всі ендпоінти відкриті).
 
+> TODO: сторінка «Про нас» (контакти, доставка, повернення) — скоріше за все, це буде статична сторінка на клієнті.
 
-3. Apply migrations to create the local SQLite database:
+---
 
-   ```bash
-   python manage.py migrate
-   ```
+## REST API
 
-4. Start the development server:
+Загальні правила:
 
-   ```bash
-   python manage.py runserver
-   ```
+- Дані передаються у форматі JSON.
+- Префікс усіх адрес: `/api`.
+- Якщо сталась помилка, у відповіді буде поле `error` з описом.
 
-## Endpoints
+### Категорії
 
-With the server running at `http://127.0.0.1:8000`:
+#### Список категорій
 
-| URL | Behavior |
-| --- | --- |
-| http://127.0.0.1:8000/ | No application homepage; may show Django's development welcome page while `DEBUG = True` |
-| http://127.0.0.1:8000/admin/ | Django admin, available after applying migrations |
+- **Навіщо:** показати меню категорій.
+- **Метод:** `GET /api/categories`
+- **Request body:** немає
+- **Response:** `200 OK`. Список категорій, у кожної є `id` і `name`.
 
-With `DEBUG = False`, unmatched URLs such as `/` return HTTP 404.
+#### Створити категорію
 
-To create an account for admin login, run this after applying migrations:
+- **Навіщо:** адміністратор додає нову категорію.
+- **Метод:** `POST /api/categories`
+- **Request body:** `name` (назва).
+- **Response:** `201 Created`. Створена категорія з `id` і `name`.
+- Якщо немає назви: `400 Bad Request`.
 
-```bash
-python manage.py createsuperuser
-```
+#### Змінити категорію
 
-## Add your first application
+- **Навіщо:** адміністратор змінює назву категорії.
+- **Метод:** `PATCH /api/categories/{id}`
+- **Request body:** `name` (нова назва).
+- **Response:** `200 OK`. Оновлена категорія.
+- Якщо дані неправильні: `400 Bad Request`. Якщо немає такої категорії: `404 Not Found`.
 
-1. Create an app from the directory containing `manage.py` (replace `myapp`
-   with your application name):
+#### Видалити категорію
 
-   ```bash
-   python manage.py startapp myapp
-   ```
+- **Навіщо:** адміністратор прибирає непотрібну категорію.
+- **Метод:** `DELETE /api/categories/{id}`
+- **Request body:** немає
+- **Response:** `204 No Content`.
+- Якщо немає такої категорії: `404 Not Found`. Якщо в категорії є товари: `409 Conflict`.
 
-2. Add its generated configuration class, `myapp.apps.MyappConfig`, to
-   `INSTALLED_APPS` in `config/settings.py`.
-3. Define your views and create `myapp/urls.py` with their URL patterns.
-4. Register that URLconf in `config/urls.py` using `path()` and `include()`,
-   choosing a URL prefix for the app and retaining the admin route.
+#### Товари категорії
 
-See the official Django 6.1 tutorial for
-[views and URL registration](https://docs.djangoproject.com/en/6.1/intro/tutorial01/)
-and [app registration and models](https://docs.djangoproject.com/en/6.1/intro/tutorial02/).
+- **Навіщо:** сторінка категорії з усіма її товарами.
+- **Метод:** `GET /api/categories/{id}/products`
+- **Request body:** немає
+- **Response:** `200 OK`. Список товарів категорії, у кожного є `id`, `name`, `price`, `animal_type`.
+- Якщо немає такої категорії: `404 Not Found`.
 
-## Start a REST API
+---
 
-Django REST framework and `django-cors-headers` are included and configured.
-Install the project dependencies with `python -m pip install -r requirements-dev.txt`.
-Create your own app, serializers, views, and URL patterns; no API app or
-authentication scheme is supplied.
+### Бренди
 
-## Git attributes
+#### Список брендів
 
-Git detects text files automatically and normalizes them to LF. Checkouts use
-LF on Linux and Windows, while `.bat` and `.cmd` files use CRLF. Binary files
-are auto-detected and left unchanged, helping avoid newline-only diffs.
+- **Навіщо:** сторінка з усіма брендами.
+- **Метод:** `GET /api/brands`
+- **Request body:** немає
+- **Response:** `200 OK`. Список брендів, у кожного є `id` і `name`.
 
+#### Один бренд
 
-## Code style and submission verification
+- **Навіщо:** сторінка бренду.
+- **Метод:** `GET /api/brands/{id}`
+- **Request body:** немає
+- **Response:** `200 OK`. Бренд з полями `id`, `name`, `description`, `country`.
+- Якщо немає: `404 Not Found`.
 
-All submissions are required to adhere to PEP-8, Django best practices, and standard HTML/CSS/JS formatting. A deterministic cross-platform utility is provided to help you check and format your code.
+#### Товари бренду
 
-### 1. Verification (Check Mode)
-Before submitting, verify that all files adhere to the required standards:
+- **Навіщо:** на сторінці бренду показати всі його товари.
+- **Метод:** `GET /api/brands/{id}/products`
+- **Request body:** немає
+- **Response:** `200 OK`. Список товарів бренду, у кожного є `id`, `name`, `price`, `animal_type`.
+- Якщо немає такого бренду: `404 Not Found`.
 
-```bash
-python check_submission.py
-```
+#### Додати бренд
 
-Passing these checks confirms code style, not functional API behavior. Before submitting an API, also write and run functional tests for its endpoints. If style checks fail, review the error output or run the auto-formatter below.
+- **Навіщо:** адміністратор додає виробника.
+- **Метод:** `POST /api/brands`
+- **Request body:** `name`, `description`, `country`.
+- **Response:** `201 Created`. Створений бренд з `id`.
+- Якщо немає назви: `400 Bad Request`.
 
-### 2. Auto-Formatting
-To automatically format Python files, fix safe PEP-8 rules, format Django HTML templates, and format CSS/JS static files:
+#### Змінити бренд
 
-```bash
-python check_submission.py --format
-```
+- **Навіщо:** адміністратор виправляє дані бренду.
+- **Метод:** `PATCH /api/brands/{id}`
+- **Request body:** будь-які з полів `name`, `description`, `country`.
+- **Response:** `200 OK`. Оновлений бренд.
+- Якщо дані неправильні: `400 Bad Request`. Якщо немає: `404 Not Found`.
 
-### 3. PyCharm Integration
-If you use PyCharm:
-- **One-Click Run:** In the top-right toolbar run configurations dropdown, select **"Verify Submission"** or **"Format Project"** and click the green **Play** button.
+#### Видалити бренд
 
-## Development only
+- **Навіщо:** адміністратор прибирає бренд.
+- **Метод:** `DELETE /api/brands/{id}`
+- **Request body:** немає
+- **Response:** `204 No Content`.
+- Якщо немає: `404 Not Found`. Якщо у бренду є товари: `409 Conflict`.
 
-The included settings use `DEBUG = True`, a development secret key, and a local
-SQLite database. The default mailer uses the console backend: email is printed
-to the process's console instead of being delivered.
+---
 
-This configuration and Django's development server are not suitable for
-production deployment.
+### Товари
+
+#### Список товарів
+
+- **Навіщо:** каталог із пошуком, фільтрами та сортуванням.
+- **Метод:** `GET /api/products`
+- **Параметри (необов'язкові):**
+  - `search` — пошук за назвою або брендом
+  - `animal_type` — тип тварини: `cat`, `dog`, `rodent`, `bird`, `fish`
+  - `category` — id категорії
+  - `brand` — id бренду
+  - `min_price` — мінімальна ціна
+  - `max_price` — максимальна ціна
+  - `sort` — сортування: `price_asc` (від найдешевших), `price_desc` (від найдорожчих), `popular` (за популярністю)
+- **Приклад:** `GET /api/products?animal_type=cat&category=1&max_price=500&sort=price_asc`
+- **Request body:** немає
+- **Response:** `200 OK`. Список товарів, у кожного є `id`, `name`, `price`, `animal_type`, `category_id`, `brand_id`.
+- Якщо параметр неправильний (наприклад, невідомий `sort`): `400 Bad Request`.
+
+> TBD: як рахувати популярність (скоріше за все, за кількістю проданих одиниць у замовленнях).
+
+> TBD: пагінація каталогу (`page` і `limit`).
+
+#### Один товар
+
+- **Навіщо:** сторінка товару.
+- **Метод:** `GET /api/products/{id}`
+- **Request body:** немає
+- **Response:** `200 OK`. Товар з полями `id`, `name`, `description`, `price`, `animal_type`, `weight`, `stock`, `category_id`, `brand_id`.
+- Якщо немає: `404 Not Found`.
+
+#### Додати товар
+
+- **Навіщо:** адміністратор додає товар.
+- **Метод:** `POST /api/products`
+- **Request body:** `name`, `description`, `price`, `animal_type`, `weight`, `stock`, `category_id`, `brand_id`.
+- **Response:** `201 Created`. Створений товар з `id`.
+- Якщо дані неправильні або категорії чи бренду не існує: `400 Bad Request`.
+
+#### Змінити товар
+
+- **Навіщо:** змінити ціну, опис або кількість на складі.
+- **Метод:** `PATCH /api/products/{id}`
+- **Request body:** будь-які з полів товару (крім `id`).
+- **Response:** `200 OK`. Оновлений товар.
+- Якщо дані неправильні: `400 Bad Request`. Якщо немає: `404 Not Found`.
+
+#### Видалити товар
+
+- **Навіщо:** адміністратор прибирає товар з каталогу.
+- **Метод:** `DELETE /api/products/{id}`
+- **Request body:** немає
+- **Response:** `204 No Content`.
+- Якщо немає: `404 Not Found`.
+
+---
+
+### Замовлення
+
+#### Створити замовлення
+
+- **Навіщо:** покупець оформлює замовлення.
+- **Метод:** `POST /api/orders`
+- **Request body:**
+  - `customer_name` — ім'я покупця
+  - `phone` — телефон
+  - `address` — адреса доставки
+  - `items` — список товарів, у кожного є `product_id` і `quantity`
+- **Response:** `201 Created`. Створене замовлення з `id`, `status` (спочатку `new`), `total` (загальна сума) і `customer_name`.
+- Якщо список `items` порожній або товару немає на складі: `400 Bad Request`.
+
+> TBD: оплата (спробувати тестове API LiqPay або взагалі поки зробити без оплати).
+
+#### Список замовлень
+
+- **Навіщо:** адміністратор бачить усі замовлення.
+- **Метод:** `GET /api/orders`
+- **Request body:** немає
+- **Response:** `200 OK`. Список замовлень, у кожного є `id`, `status`, `total`, `customer_name`.
+
+#### Одне замовлення
+
+- **Навіщо:** подивитись деталі замовлення.
+- **Метод:** `GET /api/orders/{id}`
+- **Request body:** немає
+- **Response:** `200 OK`. Замовлення з полями `id`, `status`, `total`, `customer_name`, `phone`, `address` і `items`. У кожного товару в `items` є `product_id`, `name`, `price`, `quantity`.
+- Якщо немає: `404 Not Found`.
+
+#### Змінити статус замовлення
+
+- **Навіщо:** адміністратор відмічає, що замовлення відправлене чи доставлене, або скасовує його.
+- **Метод:** `PATCH /api/orders/{id}`
+- **Request body:** `status`. Можливі значення: `new`, `shipped`, `delivered`, `cancelled`.
+- **Response:** `200 OK`. Оновлене замовлення.
+- Якщо статус неправильний: `400 Bad Request`. Якщо замовлення немає: `404 Not Found`.
+
+---
+
+## Схема бази даних
+
+![Схема бази даних Ly-Jess](docs/db-schema.png)
+
+Таблиці зі схеми:
+
+| Таблиця | Поля |
+|---|---|
+| `categories` | `id` (PK), `name` |
+| `brands` | `id` (PK), `name`, `description`, `country` |
+| `products` | `id` (PK), `name`, `description`, `price`, `animal_type`, `weight`, `stock`, `category_id` (FK → categories), `brand_id` (FK → brands) |
+| `orders` | `id` (PK), `customer_name`, `phone`, `address`, `status`, `total`, `created_at` |
+| `order_items` | `id` (PK), `order_id` (FK → orders), `product_id` (FK → products), `quantity`, `price` (ціна на момент покупки) |
+
+Зв'язки:
+
+- одна категорія має багато товарів (1 → багато)
+- один бренд має багато товарів (1 → багато)
+- одне замовлення має багато позицій `order_items` (1 → багато)
+- один товар може бути в багатьох позиціях замовлень (1 → багато)
+
+Таким чином, між `orders` і `products` виходить зв'язок «багато до багатьох» через проміжну таблицю `order_items`.
