@@ -1,10 +1,20 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from rest_framework_simplejwt.tokens import AccessToken
 
 from .models import Brand, Category, Product
 
 
 class ApiTestCase(TestCase):
     def setUp(self):
+        # Запис у каталог доступний лише адміністратору, тому за замовчуванням
+        # усі запити тестового клієнта йдуть з access токеном адміністратора.
+        self.admin = get_user_model().objects.create_user(
+            username="admin", password="pass-12345", is_staff=True
+        )
+        self.client.defaults["HTTP_AUTHORIZATION"] = (
+            f"Bearer {AccessToken.for_user(self.admin)}"
+        )
         self.category = Category.objects.create(name="Корм")
         self.brand = Brand.objects.create(name="Royal Canin", country="Франція")
 
@@ -34,7 +44,9 @@ class CategoryTests(ApiTestCase):
         self.assertEqual(r.status_code, 201)
         pk = r.json()["id"]
 
-        self.assertEqual(self.client.get(f"/api/categories/{pk}").json()["name"], "Іграшки")
+        self.assertEqual(
+            self.client.get(f"/api/categories/{pk}").json()["name"], "Іграшки"
+        )
         self.assertEqual(len(self.client.get("/api/categories").json()), 2)
 
         r = self.client.patch(
@@ -51,7 +63,8 @@ class CategoryTests(ApiTestCase):
 
     def test_validation(self):
         body = self.assert_error(
-            self.client.post("/api/categories", {}, content_type="application/json"), 400
+            self.client.post("/api/categories", {}, content_type="application/json"),
+            400,
         )
         self.assertIn("name", body["details"])
         self.assert_error(
@@ -64,14 +77,18 @@ class CategoryTests(ApiTestCase):
     def test_put_requires_all_fields(self):
         self.assert_error(
             self.client.put(
-                f"/api/categories/{self.category.pk}", {}, content_type="application/json"
+                f"/api/categories/{self.category.pk}",
+                {},
+                content_type="application/json",
             ),
             400,
         )
 
     def test_delete_with_products_is_409(self):
         self.make_product()
-        body = self.assert_error(self.client.delete(f"/api/categories/{self.category.pk}"), 409)
+        body = self.assert_error(
+            self.client.delete(f"/api/categories/{self.category.pk}"), 409
+        )
         self.assertIn("1", body["error"])
         self.assertTrue(Category.objects.filter(pk=self.category.pk).exists())
 
@@ -93,7 +110,9 @@ class BrandTests(ApiTestCase):
         pk = r.json()["id"]
         self.assertEqual(self.client.get(f"/api/brands/{pk}").json()["country"], "США")
         r = self.client.patch(
-            f"/api/brands/{pk}", {"description": "Корми"}, content_type="application/json"
+            f"/api/brands/{pk}",
+            {"description": "Корми"},
+            content_type="application/json",
         )
         self.assertEqual(r.json()["description"], "Корми")
         self.assertEqual(self.client.delete(f"/api/brands/{pk}").status_code, 204)
@@ -183,15 +202,22 @@ class ProductTests(ApiTestCase):
         self.assertEqual(len(names("")), 3)
         self.assertEqual(names("animal_type=dog"), ["Дорогий"])
         self.assertEqual(names(f"category={other_cat.pk}"), ["М'ячик"])
-        self.assertEqual(names(f"brand={self.brand.pk}&max_price=100&sort=price_asc"),
-                         ["М'ячик", "Дешевий"])
+        self.assertEqual(
+            names(f"brand={self.brand.pk}&max_price=100&sort=price_asc"),
+            ["М'ячик", "Дешевий"],
+        )
         self.assertEqual(names("min_price=100&sort=price_desc"), ["Дорогий", "Дешевий"])
         self.assertEqual(names("search=дорогий"), ["Дорогий"])
         self.assertEqual(names("search=royal"), ["Дешевий", "Дорогий", "М'ячик"])
 
     def test_invalid_filters_are_400(self):
-        for query in ["sort=popular", "animal_type=dragon", "min_price=abc",
-                      "category=x", "min_price=10&max_price=5"]:
+        for query in [
+            "sort=popular",
+            "animal_type=dragon",
+            "min_price=abc",
+            "category=x",
+            "min_price=10&max_price=5",
+        ]:
             with self.subTest(query=query):
                 self.assert_error(self.client.get(f"/api/products?{query}"), 400)
 
@@ -205,11 +231,94 @@ class GeneralErrorsTests(ApiTestCase):
 
     def test_broken_json_is_400(self):
         self.assert_error(
-            self.client.post("/api/categories", "{oops", content_type="application/json"), 400
+            self.client.post(
+                "/api/categories", "{oops", content_type="application/json"
+            ),
+            400,
         )
 
     def test_cors_headers(self):
-        r = self.client.get("/api/categories", headers={"Origin": "http://localhost:3000"})
+        r = self.client.get(
+            "/api/categories", headers={"Origin": "http://localhost:3000"}
+        )
         self.assertEqual(r["Access-Control-Allow-Origin"], "http://localhost:3000")
-        r = self.client.get("/api/categories", headers={"Origin": "http://evil.example"})
+        r = self.client.get(
+            "/api/categories", headers={"Origin": "http://evil.example"}
+        )
         self.assertNotIn("Access-Control-Allow-Origin", r)
+
+
+class PermissionTests(ApiTestCase):
+    write_requests = [
+        ("post", "/api/categories", {"name": "Нова"}),
+        ("put", "/api/categories/{category}", {"name": "Нова"}),
+        ("patch", "/api/categories/{category}", {"name": "Нова"}),
+        ("delete", "/api/categories/{category}", None),
+        ("post", "/api/brands", {"name": "Нова"}),
+        ("patch", "/api/brands/{brand}", {"name": "Нова"}),
+        ("delete", "/api/brands/{brand}", None),
+        ("post", "/api/products", {"name": "Нова"}),
+        ("patch", "/api/products/1", {"stock": 1}),
+        ("delete", "/api/products/1", None),
+    ]
+
+    def send_all(self):
+        for method, url, body in self.write_requests:
+            url = url.format(category=self.category.pk, brand=self.brand.pk)
+            send = getattr(self.client, method)
+            if body:
+                response = send(url, body, content_type="application/json")
+            else:
+                response = send(url)
+            yield method, url, response
+
+    def test_anonymous_can_read(self):
+        del self.client.defaults["HTTP_AUTHORIZATION"]
+        product = self.make_product()
+        for url in [
+            "/api/categories",
+            f"/api/categories/{self.category.pk}",
+            "/api/brands",
+            f"/api/brands/{self.brand.pk}",
+            "/api/products",
+            f"/api/products/{product.pk}",
+        ]:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_anonymous_cannot_write_401(self):
+        del self.client.defaults["HTTP_AUTHORIZATION"]
+        for method, url, response in self.send_all():
+            with self.subTest(method=method, url=url):
+                self.assert_error(response, 401)
+        self.assertEqual(Category.objects.count(), 1)
+
+    def test_invalid_token_is_401(self):
+        self.client.defaults["HTTP_AUTHORIZATION"] = "Bearer not-a-token"
+        self.assert_error(
+            self.client.post(
+                "/api/categories", {"name": "Нова"}, content_type="application/json"
+            ),
+            401,
+        )
+
+    def test_regular_user_cannot_write_403(self):
+        user = get_user_model().objects.create_user(
+            username="user", password="pass-12345"
+        )
+        self.client.defaults["HTTP_AUTHORIZATION"] = (
+            f"Bearer {AccessToken.for_user(user)}"
+        )
+        for method, url, response in self.send_all():
+            with self.subTest(method=method, url=url):
+                self.assert_error(response, 403)
+        self.assertEqual(Category.objects.count(), 1)
+
+    def test_regular_user_can_read(self):
+        user = get_user_model().objects.create_user(
+            username="user", password="pass-12345"
+        )
+        self.client.defaults["HTTP_AUTHORIZATION"] = (
+            f"Bearer {AccessToken.for_user(user)}"
+        )
+        self.assertEqual(self.client.get("/api/products").status_code, 200)
