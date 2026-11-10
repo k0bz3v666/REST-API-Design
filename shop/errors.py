@@ -2,11 +2,15 @@ from django.http import Http404, JsonResponse
 from rest_framework import status
 from rest_framework.exceptions import (
     APIException,
+    AuthenticationFailed,
+    NotAuthenticated,
     NotFound,
     ParseError,
+    PermissionDenied,
     ValidationError,
 )
 from rest_framework.views import exception_handler
+from rest_framework_simplejwt.exceptions import InvalidToken
 
 
 class Conflict(APIException):
@@ -35,6 +39,17 @@ def api_exception_handler(exc, context):
         message = "Некоректний JSON у тілі запиту."
     elif isinstance(exc, Http404):
         message = "Ресурс не знайдено."
+    elif isinstance(exc, InvalidToken):
+        # Має йти раніше за AuthenticationFailed, бо є його нащадком. Деталі від
+        # simplejwt англійською й у вигляді словника, тому підміняємо їх.
+        message = "Токен недійсний або його термін дії закінчився."
+    elif isinstance(exc, NotAuthenticated):
+        message = (
+            "Потрібна авторизація. Передайте access токен у заголовку "
+            "Authorization: Bearer <token>."
+        )
+    elif isinstance(exc, (AuthenticationFailed, PermissionDenied)):
+        message = str(exc.detail)
     else:
         message = str(exc.detail)
 

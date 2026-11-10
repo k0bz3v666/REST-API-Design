@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,6 +18,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
+    "accounts",
     "shop",
 ]
 
@@ -81,9 +83,21 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "EXCEPTION_HANDLER": "shop.errors.api_exception_handler",
     "COERCE_DECIMAL_TO_STRING": False,
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "DEFAULT_PERMISSION_CLASSES": [],
-    "UNAUTHENTICATED_USER": None,
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    # Безпечно за замовчуванням: читати можуть усі, змінювати — лише адміністратори.
+    "DEFAULT_PERMISSION_CLASSES": ["accounts.permissions.IsAdminOrReadOnly"],
+}
+
+SIMPLE_JWT = {
+    # Access токен живе недовго: якщо його вкрадуть, зловмисник матиме мало часу.
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    # Refresh токен живе довше: за його допомогою клієнт отримує новий access
+    # без повторного введення пароля.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "UPDATE_LAST_LOGIN": True,
 }
 
 CORS_ALLOWED_ORIGINS = [
