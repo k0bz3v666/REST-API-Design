@@ -1,122 +1,464 @@
-# web-programming-2026-template
+# Ly-Jess — інтернет-зоомагазин
 
-A reusable Django project with no bundled application, SQLite, and Django's
-standard admin, authentication, sessions, messages, and staticfiles support.
+## Про що цей сайт
 
-## Local setup
+Ly-Jess — це простий інтернет-магазин товарів для домашніх тварин: корми, ласощі, іграшки, лежаки, засоби догляду.
 
-Requires the latest patch release of Python 3.12, 3.13, or 3.14. Run these commands from the project directory containing
-`manage.py`.
+Ідея така: людина заходить на сайт, дивиться каталог, шукає товари за назвою, фільтрує за типом тварини, категорією, брендом і ціною, обирає потрібне та оформлює замовлення, вказавши своє ім'я, телефон і адресу.
 
-1. Create and activate a virtual environment:
+## Що є на сайті
 
-   ```bash
-   python -m venv .venv
-   
-   # for linux/macos
-   source .venv/bin/activate
-   # for Windows:
-   .venv\Scripts\activate
-   ```
+- **Категорії.** Корм, ласощі, іграшки, лежаки, догляд тощо.
+- **Бренди.** Виробники товарів. На сторінці бренду видно всі його товари.
+- **Товари.** У кожного є назва, опис, ціна, бренд, категорія, тип тварини (кіт, собака, гризун, птах, рибки), вага чи розмір та кількість на складі.
+- **Замовлення.** Покупець обирає товари й кількість, залишає контакти. Замовлення має статус: нове, відправлене, доставлене або скасоване.
+- **Адміністратор.** Додає, змінює й видаляє товари, бренди та категорії, а також змінює статуси замовлень.
 
-2. Install dependencies:
+> TODO: профіль з історією замовлень, кошик.
 
-   ```bash
-   python -m pip install -r requirements-dev.txt
-   ```
+> TODO: замовлення (`/api/orders`) — описані нижче, але реалізовані будуть на наступному етапі.
 
+> TODO: сторінка «Про нас» (контакти, доставка, повернення) — скоріше за все, це буде статична сторінка на клієнті.
 
-3. Apply migrations to create the local SQLite database:
+---
 
-   ```bash
-   python manage.py migrate
-   ```
+## Як запустити проєкт
 
-4. Start the development server:
-
-   ```bash
-   python manage.py runserver
-   ```
-
-## Endpoints
-
-With the server running at `http://127.0.0.1:8000`:
-
-| URL | Behavior |
-| --- | --- |
-| http://127.0.0.1:8000/ | No application homepage; may show Django's development welcome page while `DEBUG = True` |
-| http://127.0.0.1:8000/admin/ | Django admin, available after applying migrations |
-
-With `DEBUG = False`, unmatched URLs such as `/` return HTTP 404.
-
-To create an account for admin login, run this after applying migrations:
+Потрібен Python 3.12+.
 
 ```bash
-python manage.py createsuperuser
+# 1. Клонувати репозиторій і перейти в папку проєкту
+git clone <url-репозиторію>
+cd REST-API-Design
+
+# 2. Створити та активувати віртуальне середовище
+python -m venv .venv
+.venv\Scripts\activate          # Windows (PowerShell / cmd)
+# source .venv/bin/activate      # macOS / Linux
+
+# 3. Встановити залежності
+pip install -r requirements.txt
+
+# 4. Застосувати міграції (створить файл db.sqlite3)
+python manage.py migrate
+
+# 5. Запустити сервер
+python manage.py runserver
 ```
 
-## Add your first application
+API буде доступне за адресою **http://127.0.0.1:8000/api/** (наприклад, `http://127.0.0.1:8000/api/products`).
 
-1. Create an app from the directory containing `manage.py` (replace `myapp`
-   with your application name):
+Додатково:
 
-   ```bash
-   python manage.py startapp myapp
-   ```
+- `python manage.py createsuperuser` — створити адміністратора. Саме він (користувач з `is_staff=True`) може додавати, змінювати й видаляти товари, категорії та бренди через API. Звичайних користувачів, які зареєструвалися через `/api/auth/register`, можна зробити адміністраторами в `http://127.0.0.1:8000/admin/` (галочка «Статус персоналу»).
+- `python manage.py test` — запустити автотести.
 
-2. Add its generated configuration class, `myapp.apps.MyappConfig`, to
-   `INSTALLED_APPS` in `config/settings.py`.
-3. Define your views and create `myapp/urls.py` with their URL patterns.
-4. Register that URLconf in `config/urls.py` using `path()` and `include()`,
-   choosing a URL prefix for the app and retaining the admin route.
+### CORS
 
-See the official Django 6.1 tutorial for
-[views and URL registration](https://docs.djangoproject.com/en/6.1/intro/tutorial01/)
-and [app registration and models](https://docs.djangoproject.com/en/6.1/intro/tutorial02/).
+Фронтенд працює на іншому порту, ніж API (бекенд — `8000`), тому на бекенді налаштовано CORS (`django-cors-headers`, налаштування `CORS_ALLOWED_ORIGINS` у `config/settings.py`). Дозволені origin-и: `http://localhost` і `http://127.0.0.1` на портах `3000`, `5173`, `5500`, `8080`. Якщо фронтенд запускається на іншому порту, додайте його в цей список.
 
-## Start a REST API
+### Postman
 
-Django REST framework and `django-cors-headers` are included and configured.
-Install the project dependencies with `python -m pip install -r requirements-dev.txt`.
-Create your own app, serializers, views, and URL patterns; no API app or
-authentication scheme is supplied.
+Колекція (Collection v2.1) лежить у `postman/Ly-Jess.postman_collection.json`.
 
-## Git attributes
+1. Postman → **Import** → оберіть цей файл.
+2. Базова адреса зберігається у змінній колекції `base_url` (за замовчуванням `http://127.0.0.1:8000/api`). Змінити її можна у вкладці **Variables** колекції.
+3. Створіть адміністратора (`python manage.py createsuperuser`) і впишіть його логін і пароль у змінні колекції `admin_username` та `admin_password` (вкладка **Variables**).
+4. Запустіть сервер і виконайте колекцію через **Run collection** (папки йдуть по порядку: id створених об'єктів і токени підставляються автоматично). Запит «Логін адміністратора» зберігає access токен, який колекція додає до всіх запитів як `Authorization: Bearer`.
 
-Git detects text files automatically and normalizes them to LF. Checkouts use
-LF on Linux and Windows, while `.bat` and `.cmd` files use CRLF. Binary files
-are auto-detected and left unchanged, helping avoid newline-only diffs.
+У колекції є успішні запити й запити, що повертають помилки (мають префікс `[Помилка]`): 400 (невалідні дані), 401 (немає або недійсний токен), 403 (немає прав), 404 (немає об'єкта) і 409 (видалення категорії/бренду, у яких є товари).
 
+---
 
-## Code style and submission verification
+## REST API
 
-All submissions are required to adhere to PEP-8, Django best practices, and standard HTML/CSS/JS formatting. A deterministic cross-platform utility is provided to help you check and format your code.
+Загальні правила:
 
-### 1. Verification (Check Mode)
-Before submitting, verify that all files adhere to the required standards:
+- Дані передаються у форматі JSON (`Content-Type: application/json`).
+- Префікс усіх адрес: `/api`. Адреси без `/` в кінці.
+- Редагування: `PATCH` змінює лише передані поля, `PUT` вимагає всі поля об'єкта.
+- Читати каталог (`GET`) можуть усі, змінювати його (`POST`, `PUT`, `PATCH`, `DELETE`) — лише адміністратори. Докладніше в розділі [Авторизація і права доступу](#авторизація-і-права-доступу).
 
-```bash
-python check_submission.py
+### Формат помилок
+
+Усі помилки на всіх ендпоінтах мають однаковий вигляд:
+
+```json
+{
+  "error": "Зрозуміле повідомлення про те, що пішло не так",
+  "details": { "name": ["Це поле обов'язкове."] }
+}
 ```
 
-Passing these checks confirms code style, not functional API behavior. Before submitting an API, also write and run functional tests for its endpoints. If style checks fail, review the error output or run the auto-formatter below.
+Поле `error` є завжди. Поле `details` є лише в помилок валідації (`400`) і містить помилки по полях.
 
-### 2. Auto-Formatting
-To automatically format Python files, fix safe PEP-8 rules, format Django HTML templates, and format CSS/JS static files:
+| Статус | Коли | Приклад `error` |
+|---|---|---|
+| `400 Bad Request` | невалідні дані, неправильні параметри каталогу, зламаний JSON | `Некоректні дані.` |
+| `401 Unauthorized` | немає токена, токен недійсний або прострочений, невірний логін чи пароль | `Потрібна авторизація. Передайте access токен у заголовку Authorization: Bearer <token>.` |
+| `403 Forbidden` | користувач авторизований, але не має прав на дію | `Змінювати каталог можуть лише адміністратори.` |
+| `404 Not Found` | немає об'єкта з таким `id` або немає такого ендпоінта | `Категорію з id=999 не знайдено.` |
+| `405 Method Not Allowed` | метод не підтримується ендпоінтом | `Метод "DELETE" не дозволений.` |
+| `409 Conflict` | дані валідні, але дія суперечить бізнес-правилу | `Неможливо видалити категорію «Корм», оскільки в ній є товари: 3. Спочатку видаліть їх або перенесіть в іншу категорію.` |
 
-```bash
-python check_submission.py --format
+**Чому `409`, а не `400`.** `400` означає, що сам запит неправильний (відсутнє поле, текст замість числа). Запит `DELETE /api/categories/1` синтаксично правильний, а проблема в поточному стані даних (у категорії є товари), тому це конфлікт `409`. Клієнт може повторити той самий запит після того, як видалить товари.
+
+### Бізнес-правила
+
+- Категорію не можна видалити, якщо в ній є товари (`409`).
+- Бренд не можна видалити, якщо за ним закріплені товари (`409`).
+- Назви категорій і брендів унікальні (`400` при дублікаті).
+- Ціна товару більша за 0, кількість на складі не від'ємна, `animal_type` лише з дозволеного списку (`400`).
+- Категорія і бренд товару мають існувати (`400`, якщо `category_id` чи `brand_id` не знайдено).
+
+### Авторизація і права доступу
+
+Автентифікація працює на JWT (бібліотека [`djangorestframework-simplejwt`](https://django-rest-framework-simplejwt.readthedocs.io/)). Після логіну клієнт отримує два токени:
+
+| Токен | Термін життя | Для чого |
+|---|---|---|
+| `access` | 5 хвилин | передається в кожному запиті до захищених ендпоінтів |
+| `refresh` | 1 день | використовується лише для отримання нового `access` на `POST /api/auth/refresh` |
+
+**Як передавати токен.** У заголовку `Authorization` зі схемою `Bearer`:
+
+```
+Authorization: Bearer <access токен>
 ```
 
-### 3. PyCharm Integration
-If you use PyCharm:
-- **One-Click Run:** In the top-right toolbar run configurations dropdown, select **"Verify Submission"** or **"Format Project"** and click the green **Play** button.
+**Як оновлюється access токен.** Він короткоживучий, щоб вкрадений токен швидко ставав марним. Коли захищений запит повертає `401` (токен прострочений), клієнт один раз викликає `POST /api/auth/refresh` з `refresh` токеном, зберігає новий `access` і повторює початковий запит. Якщо й `refresh` недійсний (`401`), користувача розлогінюють і відправляють на сторінку входу. Ротація refresh токенів не використовується: через добу після логіну користувач входить знову.
 
-## Development only
+**Logout** виконується на клієнті: він видаляє `access` і `refresh` з сховища. Окремого ендпоінта на сервері немає (токени без blacklist не можна відкликати, вони самі завершаться за терміном дії).
 
-The included settings use `DEBUG = True`, a development secret key, and a local
-SQLite database. The default mailer uses the console backend: email is printed
-to the process's console instead of being delivered.
+**Права доступу.**
 
-This configuration and Django's development server are not suitable for
-production deployment.
+| Дія | Анонім | Звичайний користувач | Адміністратор (`is_staff`) |
+|---|---|---|---|
+| `GET` категорій, брендів, товарів | ✅ | ✅ | ✅ |
+| `POST` / `PUT` / `PATCH` / `DELETE` категорій, брендів, товарів | `401` | `403` | ✅ |
+| `GET /api/auth/me` | `401` | ✅ | ✅ |
+| `POST /api/auth/register`, `/login`, `/refresh` | ✅ | ✅ | ✅ |
+
+`401` означає «я не знаю, хто ти» (немає або недійсний токен), `403` означає «я знаю, хто ти, але тобі це не дозволено».
+
+#### Реєстрація
+
+- **Метод:** `POST /api/auth/register`
+- **Заголовки:** `Content-Type: application/json` (токен не потрібен)
+- **Request body:**
+
+| Поле | Обов'язкове | Правила |
+|---|---|---|
+| `username` | так | до 150 символів; літери, цифри та `@ . + - _`; унікальний (без урахування регістру) |
+| `first_name` | ні | до 150 символів |
+| `last_name` | ні | до 150 символів |
+| `email` | так | коректний формат `name@example.com`, до 254 символів; унікальний (без урахування регістру) |
+| `password` | так | від 8 до 128 символів; не надто поширений, не суто цифровий, не схожий на `username`/`email`/імена |
+| `password_confirm` | так | має збігатися з `password` |
+
+```json
+{
+  "username": "olena",
+  "first_name": "Олена",
+  "last_name": "Коваль",
+  "email": "olena@example.com",
+  "password": "Str0ng-pass-42",
+  "password_confirm": "Str0ng-pass-42"
+}
+```
+
+- **Response:** `201 Created`. Пароль у відповіді ніколи не повертається, а в базі зберігається лише хеш (PBKDF2).
+
+```json
+{
+  "id": 2,
+  "username": "olena",
+  "first_name": "Олена",
+  "last_name": "Коваль",
+  "email": "olena@example.com"
+}
+```
+
+- **Помилка `400 Bad Request`:** `details` містить повідомлення для кожного невалідного поля одразу.
+
+```json
+{
+  "error": "Некоректні дані.",
+  "details": {
+    "email": ["Введіть коректну адресу електронної пошти."],
+    "password_confirm": ["Паролі не збігаються."]
+  }
+}
+```
+
+#### Логін
+
+- **Метод:** `POST /api/auth/login`
+- **Заголовки:** `Content-Type: application/json` (токен не потрібен)
+- **Request body:** `username`, `password` (обидва обов'язкові).
+- **Response:** `200 OK`. Пара токенів і дані користувача (`is_staff` показує, чи він адміністратор).
+
+```json
+{
+  "access": "eyJhbGciOi...",
+  "refresh": "eyJhbGciOi...",
+  "user": {
+    "id": 2,
+    "username": "olena",
+    "first_name": "Олена",
+    "last_name": "Коваль",
+    "email": "olena@example.com",
+    "is_staff": false
+  }
+}
+```
+
+- Якщо не передано `username` або `password`: `400 Bad Request` (`details` по полях).
+- Якщо логін або пароль невірні: `401 Unauthorized`, `{"error": "Невірний username або пароль."}`.
+
+#### Оновлення access токена
+
+- **Метод:** `POST /api/auth/refresh`
+- **Заголовки:** `Content-Type: application/json` (заголовок `Authorization` не потрібен)
+- **Request body:** `refresh` — refresh токен, отриманий при логіні.
+- **Response:** `200 OK`. Новий access токен.
+
+```json
+{ "access": "eyJhbGciOi..." }
+```
+
+- Якщо `refresh` не передано: `400 Bad Request`.
+- Якщо `refresh` недійсний, прострочений, або замість нього передано access токен: `401 Unauthorized`, `{"error": "Токен недійсний або його термін дії закінчився."}`.
+
+#### Поточний користувач
+
+- **Навіщо:** дізнатися, хто зараз авторизований (ім'я, чи є адміністратором).
+- **Метод:** `GET /api/auth/me`
+- **Заголовки:** `Authorization: Bearer <access токен>`
+- **Response:** `200 OK`. Користувач у тому ж форматі, що й поле `user` при логіні.
+- Без токена або з недійсним: `401 Unauthorized`.
+
+---
+
+### Категорії
+
+#### Список категорій
+
+- **Навіщо:** показати меню категорій.
+- **Метод:** `GET /api/categories`
+- **Response:** `200 OK`. Список категорій, у кожної є `id` і `name`.
+
+#### Одна категорія
+
+- **Метод:** `GET /api/categories/{id}`
+- **Response:** `200 OK`. Категорія з `id` і `name`.
+- Якщо немає такої категорії: `404 Not Found`.
+
+#### Створити категорію
+
+- **Навіщо:** адміністратор додає нову категорію.
+- **Метод:** `POST /api/categories`
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Request body:** `name` (назва, унікальна).
+- **Response:** `201 Created`. Створена категорія з `id` і `name`.
+- Якщо немає назви або вона вже існує: `400 Bad Request`.
+
+#### Змінити категорію
+
+- **Навіщо:** адміністратор змінює назву категорії.
+- **Метод:** `PATCH /api/categories/{id}` (або `PUT`)
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Request body:** `name` (нова назва).
+- **Response:** `200 OK`. Оновлена категорія.
+- Якщо дані неправильні: `400 Bad Request`. Якщо немає такої категорії: `404 Not Found`.
+
+#### Видалити категорію
+
+- **Навіщо:** адміністратор прибирає непотрібну категорію.
+- **Метод:** `DELETE /api/categories/{id}`
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Response:** `204 No Content`.
+- Якщо немає такої категорії: `404 Not Found`. Якщо в категорії є товари: `409 Conflict`.
+
+#### Товари категорії
+
+- **Навіщо:** сторінка категорії з усіма її товарами.
+- **Метод:** `GET /api/categories/{id}/products`
+- **Response:** `200 OK`. Список товарів категорії, у кожного є `id`, `name`, `price`, `animal_type`, `category_id`, `brand_id`.
+- Якщо немає такої категорії: `404 Not Found`.
+
+---
+
+### Бренди
+
+#### Список брендів
+
+- **Навіщо:** сторінка з усіма брендами.
+- **Метод:** `GET /api/brands`
+- **Response:** `200 OK`. Список брендів, у кожного є `id` і `name`.
+
+#### Один бренд
+
+- **Навіщо:** сторінка бренду.
+- **Метод:** `GET /api/brands/{id}`
+- **Response:** `200 OK`. Бренд з полями `id`, `name`, `description`, `country`.
+- Якщо немає: `404 Not Found`.
+
+#### Товари бренду
+
+- **Навіщо:** на сторінці бренду показати всі його товари.
+- **Метод:** `GET /api/brands/{id}/products`
+- **Response:** `200 OK`. Список товарів бренду, у кожного є `id`, `name`, `price`, `animal_type`, `category_id`, `brand_id`.
+- Якщо немає такого бренду: `404 Not Found`.
+
+#### Додати бренд
+
+- **Навіщо:** адміністратор додає виробника.
+- **Метод:** `POST /api/brands`
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Request body:** `name` (обов'язково, унікальна), `description`, `country`.
+- **Response:** `201 Created`. Створений бренд з `id`.
+- Якщо немає назви або вона вже існує: `400 Bad Request`.
+
+#### Змінити бренд
+
+- **Навіщо:** адміністратор виправляє дані бренду.
+- **Метод:** `PATCH /api/brands/{id}` (або `PUT`)
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Request body:** будь-які з полів `name`, `description`, `country`.
+- **Response:** `200 OK`. Оновлений бренд.
+- Якщо дані неправильні: `400 Bad Request`. Якщо немає: `404 Not Found`.
+
+#### Видалити бренд
+
+- **Навіщо:** адміністратор прибирає бренд.
+- **Метод:** `DELETE /api/brands/{id}`
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Response:** `204 No Content`.
+- Якщо немає: `404 Not Found`. Якщо у бренду є товари: `409 Conflict`.
+
+---
+
+### Товари
+
+#### Список товарів
+
+- **Навіщо:** каталог із пошуком, фільтрами та сортуванням.
+- **Метод:** `GET /api/products`
+- **Параметри (необов'язкові):**
+  - `search` — пошук за назвою товару або назвою бренду (без урахування регістру)
+  - `animal_type` — тип тварини: `cat`, `dog`, `rodent`, `bird`, `fish`
+  - `category` — id категорії
+  - `brand` — id бренду
+  - `min_price` — мінімальна ціна
+  - `max_price` — максимальна ціна
+  - `sort` — сортування: `price_asc` (від найдешевших), `price_desc` (від найдорожчих). Без параметра товари йдуть за `id`.
+- **Приклад:** `GET /api/products?animal_type=cat&category=1&max_price=500&sort=price_asc`
+- **Response:** `200 OK`. Список товарів, у кожного є `id`, `name`, `price`, `animal_type`, `category_id`, `brand_id`.
+- Якщо параметр неправильний (наприклад, невідомий `sort` або `min_price` більша за `max_price`): `400 Bad Request`.
+
+> TODO: сортування `popular` (за популярністю) з'явиться разом із замовленнями — популярність рахуватиметься за кількістю проданих одиниць.
+
+> TBD: пагінація каталогу (`page` і `limit`).
+
+#### Один товар
+
+- **Навіщо:** сторінка товару.
+- **Метод:** `GET /api/products/{id}`
+- **Response:** `200 OK`. Товар з полями `id`, `name`, `description`, `price`, `animal_type`, `weight`, `stock`, `category_id`, `brand_id`.
+- Якщо немає: `404 Not Found`.
+
+#### Додати товар
+
+- **Навіщо:** адміністратор додає товар.
+- **Метод:** `POST /api/products`
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Request body:** `name`, `price`, `animal_type`, `category_id`, `brand_id` (обов'язкові); `description`, `weight`, `stock` (за замовчуванням `0`).
+- **Response:** `201 Created`. Створений товар з `id`.
+- Якщо дані неправильні або категорії чи бренду не існує: `400 Bad Request`.
+
+#### Змінити товар
+
+- **Навіщо:** змінити ціну, опис або кількість на складі.
+- **Метод:** `PATCH /api/products/{id}` (або `PUT`)
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Request body:** будь-які з полів товару (крім `id`).
+- **Response:** `200 OK`. Оновлений товар.
+- Якщо дані неправильні: `400 Bad Request`. Якщо немає: `404 Not Found`.
+
+#### Видалити товар
+
+- **Навіщо:** адміністратор прибирає товар з каталогу.
+- **Метод:** `DELETE /api/products/{id}`
+- **Доступ:** лише адміністратор. Заголовок `Authorization: Bearer <access токен>`. Без токена: `401`, не адміністратор: `403`.
+- **Response:** `204 No Content`.
+- Якщо немає: `404 Not Found`.
+
+---
+
+### Замовлення
+
+> Не реалізовано на цьому етапі (замовлення і кошик заплановані на наступні етапи). Нижче — запланований дизайн API.
+
+
+#### Створити замовлення
+
+- **Навіщо:** покупець оформлює замовлення.
+- **Метод:** `POST /api/orders`
+- **Request body:**
+  - `customer_name` — ім'я покупця
+  - `phone` — телефон
+  - `address` — адреса доставки
+  - `items` — список товарів, у кожного є `product_id` і `quantity`
+- **Response:** `201 Created`. Створене замовлення з `id`, `status` (спочатку `new`), `total` (загальна сума) і `customer_name`.
+- Якщо список `items` порожній або товару немає на складі: `400 Bad Request`.
+
+> TBD: оплата (спробувати тестове API LiqPay або взагалі поки зробити без оплати).
+
+#### Список замовлень
+
+- **Навіщо:** адміністратор бачить усі замовлення.
+- **Метод:** `GET /api/orders`
+- **Request body:** немає
+- **Response:** `200 OK`. Список замовлень, у кожного є `id`, `status`, `total`, `customer_name`.
+
+#### Одне замовлення
+
+- **Навіщо:** подивитись деталі замовлення.
+- **Метод:** `GET /api/orders/{id}`
+- **Request body:** немає
+- **Response:** `200 OK`. Замовлення з полями `id`, `status`, `total`, `customer_name`, `phone`, `address` і `items`. У кожного товару в `items` є `product_id`, `name`, `price`, `quantity`.
+- Якщо немає: `404 Not Found`.
+
+#### Змінити статус замовлення
+
+- **Навіщо:** адміністратор відмічає, що замовлення відправлене чи доставлене, або скасовує його.
+- **Метод:** `PATCH /api/orders/{id}`
+- **Request body:** `status`. Можливі значення: `new`, `shipped`, `delivered`, `cancelled`.
+- **Response:** `200 OK`. Оновлене замовлення.
+- Якщо статус неправильний: `400 Bad Request`. Якщо замовлення немає: `404 Not Found`.
+
+---
+
+## Схема бази даних
+
+![Схема бази даних Ly-Jess](docs/db-schema.png)
+
+Таблиці зі схеми:
+
+| Таблиця | Поля |
+|---|---|
+| `categories` | `id` (PK), `name` |
+| `brands` | `id` (PK), `name`, `description`, `country` |
+| `products` | `id` (PK), `name`, `description`, `price`, `animal_type`, `weight`, `stock`, `category_id` (FK → categories), `brand_id` (FK → brands) |
+| `orders` | `id` (PK), `customer_name`, `phone`, `address`, `status`, `total`, `created_at` |
+| `order_items` | `id` (PK), `order_id` (FK → orders), `product_id` (FK → products), `quantity`, `price` (ціна на момент покупки) |
+
+Зв'язки:
+
+- одна категорія має багато товарів (1 → багато)
+- один бренд має багато товарів (1 → багато)
+- одне замовлення має багато позицій `order_items` (1 → багато)
+- один товар може бути в багатьох позиціях замовлень (1 → багато)
+
+Таким чином, між `orders` і `products` виходить зв'язок «багато до багатьох» через проміжну таблицю `order_items`.
