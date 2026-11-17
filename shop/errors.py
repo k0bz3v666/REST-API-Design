@@ -1,3 +1,5 @@
+import logging
+
 from django.http import Http404, JsonResponse
 from rest_framework import status
 from rest_framework.exceptions import (
@@ -13,6 +15,9 @@ from rest_framework.views import exception_handler
 from rest_framework_simplejwt.exceptions import InvalidToken
 
 
+logger = logging.getLogger(__name__)
+
+
 class Conflict(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_detail = "Операція суперечить поточному стану даних."
@@ -24,6 +29,37 @@ def get_or_404(model, pk, what):
         return model.objects.get(pk=pk)
     except model.DoesNotExist:
         raise NotFound(f"{what} з id={pk} не знайдено.") from None
+
+
+def describe_actor(request):
+    try:
+        user = request.user
+        if user.is_authenticated:
+            return f"user_id={user.pk}"
+    except Exception:
+        return "unknown"
+    return "anonymous"
+
+
+def log_api_error(exc, response, context, details=None):
+    request = context.get("request")
+    if request is None:
+        return
+    line = "%s %s -> %s (%s): %s" % (
+        request.method,
+        request.path,
+        response.status_code,
+        describe_actor(request),
+        type(exc).__name__,
+    )
+    if isinstance(details, dict):
+        line += " fields=%s" % sorted(details)
+    if response.status_code >= 500:
+        logger.error(line)
+    elif response.status_code in (401, 403, 409):
+        logger.warning(line)
+    else:
+        logger.debug(line)
 
 
 def api_exception_handler(exc, context):
@@ -40,8 +76,8 @@ def api_exception_handler(exc, context):
     elif isinstance(exc, Http404):
         message = "Ресурс не знайдено."
     elif isinstance(exc, InvalidToken):
-        # Має йти раніше за AuthenticationFailed, бо є його нащадком. Деталі від
-        # simplejwt англійською й у вигляді словника, тому підміняємо їх.
+
+
         message = "Токен недійсний або його термін дії закінчився."
     elif isinstance(exc, NotAuthenticated):
         message = (
@@ -57,6 +93,7 @@ def api_exception_handler(exc, context):
     if details is not None:
         body["details"] = details
     response.data = body
+    log_api_error(exc, response, context, details)
     return response
 
 

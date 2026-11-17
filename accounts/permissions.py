@@ -2,7 +2,6 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 
 class IsAdminOrReadOnly(BasePermission):
-    """Читати можуть усі, змінювати дані — лише адміністратори (is_staff)."""
 
     message = "Змінювати каталог можуть лише адміністратори."
 

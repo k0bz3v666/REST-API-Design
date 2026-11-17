@@ -7,8 +7,8 @@ from .models import Brand, Category, Product
 
 class ApiTestCase(TestCase):
     def setUp(self):
-        # Запис у каталог доступний лише адміністратору, тому за замовчуванням
-        # усі запити тестового клієнта йдуть з access токеном адміністратора.
+
+
         self.admin = get_user_model().objects.create_user(
             username="admin", password="pass-12345", is_staff=True
         )

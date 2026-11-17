@@ -9,7 +9,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 User = get_user_model()
 
 PASSWORD_MIN_LENGTH = 8
-# Верхня межа потрібна, щоб не змушувати сервер хешувати гігантські рядки.
+
 PASSWORD_MAX_LENGTH = 128
 
 
@@ -69,8 +69,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 {"password_confirm": "Паролі не збігаються."}
             )
 
-        # Складність пароля: не надто поширений, не суто цифровий і не схожий
-        # на дані користувача (див. AUTH_PASSWORD_VALIDATORS у settings.py).
+
         candidate = User(
             username=attrs["username"],
             email=attrs["email"],
@@ -85,8 +84,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop("password_confirm")
-        # create_user хешує пароль (PBKDF2), у БД він ніколи не лежить у відкритому
-        # вигляді.
+
+
         return User.objects.create_user(**validated_data)
 
 
@@ -98,7 +97,6 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(TokenObtainPairSerializer):
-    """Перевіряє username + password і повертає пару токенів та дані користувача."""
 
     default_error_messages = {"no_active_account": "Невірний username або пароль."}
 

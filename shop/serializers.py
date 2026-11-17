@@ -83,19 +83,44 @@ class ProductListSerializer(serializers.ModelSerializer):
 class ProductFilterSerializer(serializers.Serializer):
     SORT_CHOICES = ["price_asc", "price_desc"]
 
-    search = serializers.CharField(required=False, allow_blank=True)
-    animal_type = serializers.ChoiceField(
-        choices=Product.AnimalType.choices, required=False
+    search = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Пошук за назвою товару або бренду (без урахування регістру).",
     )
-    category = serializers.IntegerField(required=False, min_value=1)
-    brand = serializers.IntegerField(required=False, min_value=1)
+    animal_type = serializers.ChoiceField(
+        choices=Product.AnimalType.choices,
+        required=False,
+        help_text="Тип тварини.",
+    )
+    category = serializers.IntegerField(
+        required=False, min_value=1, help_text="id категорії."
+    )
+    brand = serializers.IntegerField(
+        required=False, min_value=1, help_text="id бренду."
+    )
     min_price = serializers.DecimalField(
-        max_digits=10, decimal_places=2, required=False, min_value=Decimal("0")
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        min_value=Decimal("0"),
+        help_text="Мінімальна ціна.",
     )
     max_price = serializers.DecimalField(
-        max_digits=10, decimal_places=2, required=False, min_value=Decimal("0")
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        min_value=Decimal("0"),
+        help_text="Максимальна ціна (не менша за min_price).",
     )
-    sort = serializers.ChoiceField(choices=SORT_CHOICES, required=False)
+    sort = serializers.ChoiceField(
+        choices=SORT_CHOICES,
+        required=False,
+        help_text=(
+            "Сортування: price_asc — від найдешевших, price_desc — від "
+            "найдорожчих. Без параметра товари йдуть за id."
+        ),
+    )
 
     def validate(self, attrs):
         min_price = attrs.get("min_price")
