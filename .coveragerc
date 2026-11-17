@@ -1,0 +1,13 @@
+[run]
+source = accounts, shop, config
+branch = True
+omit =
+    */migrations/*
+    */tests.py
+    */tests/*
+    config/asgi.py
+    config/wsgi.py
+
+[report]
+show_missing = True
+skip_covered = False
